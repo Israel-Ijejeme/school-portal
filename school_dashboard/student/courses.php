@@ -2,8 +2,8 @@
 require_once '../classes/SessionManager.php';
 require_once '../classes/User.php';
 require_once '../classes/Course.php';
-require_once '../classes/Grade.php';
 require_once '../classes/Semester.php';
+require_once '../classes/Department.php';
 require_once '../classes/Utility.php';
 
 SessionManager::startSession();
@@ -20,193 +20,347 @@ $user_id = SessionManager::getUserId();
 $user = new User();
 $userData = $user->getUserById($user_id);
 
-// Get student's courses
+// Initialize classes
 $course = new Course();
-$studentCourses = $course->getStudentCourses($user_id);
-
-// Get semester info
 $semester = new Semester();
-$semesters = $semester->getAllSemesters();
+$department = new Department();
+
+// Get current semester
 $currentSemester = $semester->getCurrentSemester();
-
-// Get grades
-$grade = new Grade();
-
-// Filter by semester if requested
-$selected_semester_id = isset($_GET['semester_id']) ? intval($_GET['semester_id']) : ($currentSemester ? $currentSemester['id'] : 0);
-
-// Filter courses by semester if selected
-if ($selected_semester_id > 0) {
-    $filteredCourses = array_filter($studentCourses, function($course) use ($selected_semester_id) {
-        return $course['semester_id'] == $selected_semester_id;
-    });
-} else {
-    $filteredCourses = $studentCourses;
+if (!$currentSemester) {
+    SessionManager::setFlash('error', 'No current semester is set. Please contact the administrator.');
+    header('Location: dashboard.php');
+    exit;
 }
 
-// Handle course unregister
-if (Utility::isPostRequest() && isset($_POST['unregister']) && isset($_POST['course_id'])) {
+// Get student's department
+$studentDepartment = $department->getDepartmentById($userData['department_id']);
+
+// Get all departments for filtering
+$allDepartments = $department->getAllDepartments();
+
+// Get courses already registered by the student
+$registeredCourses = $course->getStudentCourses($user_id);
+$registeredCourseIds = [];
+foreach ($registeredCourses as $rc) {
+    if ($rc['semester_id'] == $currentSemester['id']) {
+        $registeredCourseIds[] = $rc['id'];
+    }
+}
+
+// Filter by department if requested
+$selected_department_id = isset($_GET['department_id']) ? intval($_GET['department_id']) : 0;
+
+// Get available courses for the current semester
+$availableCourses = $course->getCoursesBySemesterId($currentSemester['id']);
+
+// Filter courses by department if selected
+if ($selected_department_id > 0) {
+    $filteredCourses = array_filter($availableCourses, function($course) use ($selected_department_id) {
+        return $course['department_id'] == $selected_department_id;
+    });
+} else {
+    $filteredCourses = $availableCourses;
+}
+
+// Handle course registration
+if (Utility::isPostRequest() && isset($_POST['register']) && isset($_POST['course_id'])) {
     $course_id = intval($_POST['course_id']);
     
-    // Check if the course is in the current semester
-    $canUnregister = false;
-    foreach ($studentCourses as $c) {
-        if ($c['id'] == $course_id && $c['semester_id'] == $currentSemester['id']) {
-            $canUnregister = true;
+    // Check if course is in the list of available courses
+    $courseValid = false;
+    foreach ($filteredCourses as $c) {
+        if ($c['id'] == $course_id && !in_array($c['id'], $registeredCourseIds)) {
+            $courseValid = true;
             break;
         }
     }
     
-    if ($canUnregister) {
-        $result = $course->unregisterStudentFromCourse($user_id, $course_id);
+    if ($courseValid) {
+        $result = $course->registerStudentForCourse($user_id, $course_id, $currentSemester['id']);
         
         if ($result) {
-            SessionManager::setFlash('success', 'Successfully unregistered from the course.');
+            SessionManager::setFlash('success', 'Successfully registered for the course.');
             header('Location: courses.php');
             exit;
         } else {
-            SessionManager::setFlash('error', 'Failed to unregister from the course. Please try again.');
+            SessionManager::setFlash('error', 'Failed to register for the course. You may already be registered.');
         }
     } else {
-        SessionManager::setFlash('error', 'You can only unregister from courses in the current semester.');
+        SessionManager::setFlash('error', 'Invalid course selection or you are already registered for this course.');
     }
 }
-
-// Include header
-include '../includes/header.php';
 ?>
-
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>My Courses</h1>
-        <a href="register_courses.php" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> Register New Courses
-        </a>
-    </div>
-    
-    <!-- Semester Filter -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Filter Courses</h6>
-        </div>
-        <div class="card-body">
-            <form method="GET" action="courses.php" class="form-inline">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group mb-2">
-                            <label for="semester_id" class="me-2">Semester:</label>
-                            <select name="semester_id" id="semester_id" class="form-control" onchange="this.form.submit()">
-                                <option value="0">All Semesters</option>
-                                <?php foreach ($semesters as $sem): ?>
-                                    <option value="<?php echo $sem['id']; ?>" <?php echo $selected_semester_id == $sem['id'] ? 'selected' : ''; ?>>
-                                        <?php echo $sem['name']; ?> <?php echo $sem['is_current'] ? '(Current)' : ''; ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Courses</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .navbar {
+            background-color: #0d6efd;
+            padding: 10px 0;
+        }
+        .navbar-brand {
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        .layout-container {
+            display: table;
+            width: 100%;
+            height: calc(100vh - 56px);
+        }
+        .sidebar {
+            display: table-cell;
+            width: 250px;
+            background-color: #f8f9fa;
+            vertical-align: top;
+            border-right: 1px solid #dee2e6;
+        }
+        .content {
+            display: table-cell;
+            vertical-align: top;
+            padding: 20px;
+        }
+        .list-group-item {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+        }
+        .list-group-item.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .alert {
+            margin-bottom: 15px;
+        }
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="dashboard.php">Student Dashboard</a>
+            <div class="ms-auto">
+                <div class="dropdown">
+                    <a class="text-white dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
+                        <i class="fas fa-user-circle"></i> <?php echo $userData['full_name']; ?>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuLink">
+                        <li><a class="dropdown-item" href="profile.php">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
+                    </ul>
                 </div>
-            </form>
+            </div>
         </div>
-    </div>
-    
-    <!-- Courses List -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Enrolled Courses (<?php echo count($filteredCourses); ?>)
-            </h6>
+    </nav>
+
+    <!-- Layout Container -->
+    <div class="layout-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="list-group list-group-flush">
+                <a href="dashboard.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                </a>
+                <a href="courses.php" class="list-group-item list-group-item-action active">
+                    <i class="fas fa-book me-2"></i> My Courses
+                </a>
+                <a href="grades.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-chart-bar me-2"></i> My Grades
+                </a>
+                <a href="profile.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-user me-2"></i> Profile
+                </a>
+                <a href="../logout.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                </a>
+            </div>
         </div>
-        <div class="card-body">
-            <?php if (empty($filteredCourses)): ?>
-                <div class="alert alert-info">
-                    <p>You are not enrolled in any courses for the selected semester.</p>
-                    <?php if ($selected_semester_id == ($currentSemester ? $currentSemester['id'] : 0)): ?>
-                        <p>Click the "Register New Courses" button to register for courses.</p>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Register Courses for <?php echo $currentSemester['name']; ?></h1>
+                <a href="dashboard.php" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+            
+            <!-- Department Filter -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Filter Courses by Department</h6>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="courses.php" class="form-inline">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-2">
+                                    <label for="department_id" class="me-2">Department:</label>
+                                    <select name="department_id" id="department_id" class="form-control" onchange="this.form.submit()">
+                                        <option value="0">All Departments</option>
+                                        <?php foreach ($allDepartments as $dept): ?>
+                                            <option value="<?php echo $dept['id']; ?>" <?php echo $selected_department_id == $dept['id'] ? 'selected' : ''; ?>>
+                                                <?php echo $dept['name']; ?>
+                                                <?php echo $userData['department_id'] == $dept['id'] ? ' (My Department)' : ''; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Registered Courses -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        My Registered Courses for <?php echo $currentSemester['name']; ?>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <?php
+                    $currentSemesterCourses = array_filter($registeredCourses, function($c) use ($currentSemester) {
+                        return $c['semester_id'] == $currentSemester['id'];
+                    });
+                    ?>
+                    
+                    <?php if (empty($currentSemesterCourses)): ?>
+                        <div class="alert alert-info">
+                            <p>You are not registered for any courses in the current semester.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Course Code</th>
+                                        <th>Title</th>
+                                        <th>Department</th>
+                                        <th>Credit Units</th>
+                                        <th>Teacher</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($currentSemesterCourses as $c): ?>
+                                        <tr>
+                                            <td><?php echo $c['course_code']; ?></td>
+                                            <td><?php echo $c['title']; ?></td>
+                                            <td><?php echo $c['department_name']; ?></td>
+                                            <td><?php echo $c['credit_units']; ?></td>
+                                            <td><?php echo $c['teacher_name']; ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <?php
+                        $totalRegisteredCredits = 0;
+                        foreach ($currentSemesterCourses as $c) {
+                            $totalRegisteredCredits += $c['credit_units'];
+                        }
+                        ?>
+                        <div class="mt-3">
+                            <p><strong>Total Registered Credit Units:</strong> <?php echo $totalRegisteredCredits; ?></p>
+                        </div>
                     <?php endif; ?>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-bordered" width="100%" cellspacing="0">
-                        <thead>
-                            <tr>
-                                <th>Course Code</th>
-                                <th>Title</th>
-                                <th>Department</th>
-                                <th>Semester</th>
-                                <th>Credit Units</th>
-                                <th>Teacher</th>
-                                <th>Grade</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($filteredCourses as $c): 
-                                // Get grade for this course if any
-                                $courseGrade = $grade->getGrade($user_id, $c['id'], $c['semester_id']);
-                                $hasGrade = $courseGrade !== false;
-                            ?>
-                                <tr>
-                                    <td><?php echo $c['course_code']; ?></td>
-                                    <td><?php echo $c['title']; ?></td>
-                                    <td><?php echo $c['department_name']; ?></td>
-                                    <td>
-                                        <?php echo $c['semester_name']; ?>
-                                        <?php if ($currentSemester && $c['semester_id'] == $currentSemester['id']): ?>
-                                            <span class="badge bg-primary">Current</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo $c['credit_units']; ?></td>
-                                    <td><?php echo $c['teacher_name']; ?></td>
-                                    <td>
-                                        <?php if ($hasGrade): ?>
-                                            <span class="badge <?php echo ($courseGrade['grade'] == 'F') ? 'bg-danger' : (($courseGrade['grade'] == 'A') ? 'bg-success' : 'bg-primary'); ?>">
-                                                <?php echo $courseGrade['grade']; ?> (<?php echo $courseGrade['score']; ?>%)
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-secondary">Not Graded</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($currentSemester && $c['semester_id'] == $currentSemester['id'] && !$hasGrade): ?>
-                                            <form method="POST" action="" style="display:inline;">
-                                                <input type="hidden" name="course_id" value="<?php echo $c['id']; ?>">
-                                                <button type="submit" name="unregister" class="btn btn-sm btn-danger" 
-                                                        onclick="return confirm('Are you sure you want to unregister from this course?');">
-                                                    <i class="fas fa-times-circle"></i> Unregister
-                                                </button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+            </div>
+            
+            <!-- Available Courses -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Available Courses for Registration
+                    </h6>
                 </div>
-            <?php endif; ?>
+                <div class="card-body">
+                    <?php if (empty($filteredCourses)): ?>
+                        <div class="alert alert-info">
+                            <p>No courses available for the selected filter.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Course Code</th>
+                                        <th>Title</th>
+                                        <th>Department</th>
+                                        <th>Credit Units</th>
+                                        <th>Teacher</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($filteredCourses as $c): ?>
+                                        <tr>
+                                            <td><?php echo $c['course_code']; ?></td>
+                                            <td><?php echo $c['title']; ?></td>
+                                            <td>
+                                                <?php echo $c['department_name']; ?>
+                                                <?php if ($c['department_id'] == $userData['department_id']): ?>
+                                                    <span class="badge bg-primary">My Department</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo $c['credit_units']; ?></td>
+                                            <td><?php echo $c['teacher_name']; ?></td>
+                                            <td>
+                                                <?php if (in_array($c['id'], $registeredCourseIds)): ?>
+                                                    <span class="badge bg-success">Already Registered</span>
+                                                <?php else: ?>
+                                                    <form method="POST" action="" style="display:inline;">
+                                                        <input type="hidden" name="course_id" value="<?php echo $c['id']; ?>">
+                                                        <button type="submit" name="register" class="btn btn-sm btn-primary">
+                                                            <i class="fas fa-plus-circle"></i> Register
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
     
-    <!-- Credit Units Summary -->
-    <?php if (!empty($filteredCourses)): ?>
-        <div class="card shadow mb-4">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Credit Units Summary</h6>
-            </div>
-            <div class="card-body">
-                <?php
-                $totalCredits = 0;
-                foreach ($filteredCourses as $c) {
-                    $totalCredits += $c['credit_units'];
-                }
-                ?>
-                <p><strong>Total Credit Units:</strong> <?php echo $totalCredits; ?></p>
-            </div>
+    <!-- Footer -->
+    <footer class="bg-light text-center text-lg-start mt-auto">
+        <div class="text-center p-3" style="background-color: rgba(0, 0, 0, 0.05);">
+            © 2023 Student Dashboard - Nigerian Education System
         </div>
-    <?php endif; ?>
-</div>
-
-<?php
-// Include footer
-include '../includes/footer.php';
-?> 
+    </footer>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

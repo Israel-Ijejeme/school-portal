@@ -32,92 +32,195 @@ $currentSemester = $semester->getCurrentSemester();
 $grade = new Grade();
 $studentGrades = $grade->getStudentGrades($user_id);
 $cgpa = $grade->calculateCGPA($user_id);
-
-// Include header
-include '../includes/header.php';
 ?>
-
-<div class="container-fluid">
-    <h1 class="mt-4 mb-4">Student Dashboard</h1>
-    
-    <div class="row">
-        <!-- Stats Cards -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Courses Enrolled</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo count($studentCourses); ?></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-book fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .navbar {
+            background-color: #0d6efd;
+            padding: 10px 0;
+        }
+        .navbar-brand {
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        .layout-container {
+            display: table;
+            width: 100%;
+            height: calc(100vh - 56px);
+        }
+        .sidebar {
+            display: table-cell;
+            width: 250px;
+            background-color: #f8f9fa;
+            vertical-align: top;
+            border-right: 1px solid #dee2e6;
+        }
+        .content {
+            display: table-cell;
+            vertical-align: top;
+            padding: 20px;
+        }
+        .list-group-item {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+        }
+        .list-group-item.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .alert {
+            margin-bottom: 15px;
+        }
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="dashboard.php">Student Dashboard</a>
+            <div class="ms-auto">
+                <div class="dropdown">
+                    <a class="text-white dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
+                        <i class="fas fa-user-circle"></i> <?php echo $userData['full_name']; ?>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuLink">
+                        <li><a class="dropdown-item" href="profile.php">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
+    </nav>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                CGPA</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo number_format($cgpa, 2); ?>/5.0</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+    <!-- Layout Container -->
+    <div class="layout-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="list-group list-group-flush">
+                <a href="dashboard.php" class="list-group-item list-group-item-action active">
+                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                </a>
+                <a href="courses.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-book me-2"></i> My Courses
+                </a>
+                <a href="grades.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-chart-bar me-2"></i> My Grades
+                </a>
+                <a href="profile.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-user me-2"></i> Profile
+                </a>
+                <a href="../logout.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                </a>
             </div>
         </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Current Semester</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                <?php echo $currentSemester ? $currentSemester['name'] : 'N/A'; ?>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <h1 class="mb-4">Student Dashboard</h1>
+            
+            <!-- Stats Cards -->
+            <div class="row">
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-primary shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Courses Enrolled</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo count($studentCourses); ?></div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-book fa-2x text-gray-300"></i>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
-                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Classification</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                <?php echo Utility::getCGPAClassification($cgpa); ?>
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-success shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                        CGPA</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo number_format($cgpa, 2); ?>/5.0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-medal fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-info shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        Current Semester</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                        <?php echo $currentSemester ? $currentSemester['name'] : 'N/A'; ?>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-warning shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Classification</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                        <?php echo Utility::getCGPAClassification($cgpa); ?>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-medal fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Recent Courses -->
-        <div class="col-lg-6 mb-4">
+            
+            <!-- My Courses -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">My Courses</h6>
@@ -159,54 +262,8 @@ include '../includes/header.php';
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
-
-        <!-- Recent Grades -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Grades</h6>
-                </div>
-                <div class="card-body">
-                    <?php if (empty($studentGrades)): ?>
-                        <p class="text-center">No grades available yet.</p>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Course</th>
-                                        <th>Score</th>
-                                        <th>Grade</th>
-                                        <th>Grade Point</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach (array_slice($studentGrades, 0, 5) as $grade): ?>
-                                        <tr>
-                                            <td><?php echo $grade['course_code']; ?></td>
-                                            <td><?php echo $grade['score']; ?></td>
-                                            <td><?php echo $grade['grade']; ?></td>
-                                            <td><?php echo $grade['grade_point']; ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                            <?php if (count($studentGrades) > 5): ?>
-                                <div class="text-center">
-                                    <a href="grades.php" class="btn btn-primary btn-sm">View All Grades</a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Student Information -->
-    <div class="row">
-        <div class="col-lg-12 mb-4">
+            
+            <!-- Student Information -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Student Information</h6>
@@ -237,9 +294,15 @@ include '../includes/header.php';
             </div>
         </div>
     </div>
-</div>
-
-<?php
-// Include footer
-include '../includes/footer.php';
-?> 
+    
+    <!-- Footer -->
+    <footer class="bg-light text-center text-lg-start mt-auto">
+        <div class="text-center p-3" style="background-color: rgba(0, 0, 0, 0.05);">
+            © 2023 Student Dashboard - Nigerian Education System
+        </div>
+    </footer>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -3,7 +3,6 @@ require_once '../classes/SessionManager.php';
 require_once '../classes/User.php';
 require_once '../classes/Course.php';
 require_once '../classes/Semester.php';
-require_once '../classes/Utility.php';
 
 SessionManager::startSession();
 
@@ -49,84 +48,201 @@ foreach ($teacherCourses as $courseData) {
         ];
     }
 }
-
-// Include header
-include '../includes/header.php';
 ?>
-
-<div class="container-fluid">
-    <h1 class="mt-4 mb-4">My Students</h1>
-    
-    <!-- Students Table -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Students (<?php echo count($allStudents); ?> total)
-            </h6>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Students</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .navbar {
+            background-color: #0d6efd;
+            padding: 10px 0;
+        }
+        .navbar-brand {
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        .layout-container {
+            display: table;
+            width: 100%;
+            height: calc(100vh - 56px);
+        }
+        .sidebar {
+            display: table-cell;
+            width: 250px;
+            background-color: #f8f9fa;
+            vertical-align: top;
+            border-right: 1px solid #dee2e6;
+        }
+        .content {
+            display: table-cell;
+            vertical-align: top;
+            padding: 20px;
+        }
+        .list-group-item {
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+        }
+        .list-group-item.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .alert {
+            margin-bottom: 15px;
+        }
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="dashboard.php">Teacher Dashboard</a>
+            <div class="ms-auto">
+                <div class="dropdown">
+                    <a class="text-white dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
+                        <i class="fas fa-user-circle"></i> <?php echo SessionManager::getUserName(); ?>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuLink">
+                        <li><a class="dropdown-item" href="profile.php">Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
+                    </ul>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <?php if (empty($allStudents)): ?>
-                <div class="alert alert-info">
-                    <p>You do not have any students enrolled in your courses.</p>
+    </nav>
+
+    <!-- Layout Container -->
+    <div class="layout-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="list-group list-group-flush">
+                <a href="dashboard.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                </a>
+                <a href="courses.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-book me-2"></i> My Courses
+                </a>
+                <a href="students.php" class="list-group-item list-group-item-action active">
+                    <i class="fas fa-user-graduate me-2"></i> My Students
+                </a>
+                <a href="grades.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-chart-bar me-2"></i> Manage Grades
+                </a>
+                
+                <a href="profile.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-user me-2"></i> Profile
+                </a>
+                <a href="../logout.php" class="list-group-item list-group-item-action">
+                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                </a>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <h1 class="mb-4">My Students</h1>
+            
+            <!-- Students Table -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Students (<?php echo count($allStudents); ?> total)
+                    </h6>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-bordered" width="100%" cellspacing="0">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Department</th>
-                                <th>Courses</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($allStudents as $student): ?>
-                                <tr>
-                                    <td><?php echo $student['id']; ?></td>
-                                    <td><?php echo $student['full_name']; ?></td>
-                                    <td><?php echo $student['email']; ?></td>
-                                    <td><?php echo $student['department_name']; ?></td>
-                                    <td>
-                                        <?php foreach ($student['courses'] as $course): ?>
-                                            <div>
-                                                <a href="course_students.php?course_id=<?php echo $course['id']; ?>">
-                                                    <?php echo $course['code']; ?>: <?php echo $course['title']; ?>
-                                                </a>
-                                                <?php if ($currentSemester && $course['semester_id'] == $currentSemester['id']): ?>
-                                                    <span class="badge bg-primary">Current</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                        // Show links for current semester courses
-                                        $currentSemesterCourses = array_filter($student['courses'], function($c) use ($currentSemester) {
-                                            return $currentSemester && $c['semester_id'] == $currentSemester['id'];
-                                        });
-                                        
-                                        foreach ($currentSemesterCourses as $course): 
-                                        ?>
-                                            <a href="grade_student.php?student_id=<?php echo $student['id']; ?>&course_id=<?php echo $course['id']; ?>" 
-                                               class="btn btn-sm btn-success mb-1">
-                                                <i class="fas fa-edit"></i> Grade (<?php echo $course['code']; ?>)
-                                            </a>
-                                        <?php endforeach; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                <div class="card-body">
+                    <?php if (empty($allStudents)): ?>
+                        <div class="alert alert-info">
+                            <p>You do not have any students enrolled in your courses.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Department</th>
+                                        <th>Courses</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($allStudents as $student): ?>
+                                        <tr>
+                                            <td><?php echo $student['id']; ?></td>
+                                            <td><?php echo $student['full_name']; ?></td>
+                                            <td><?php echo $student['email']; ?></td>
+                                            <td><?php echo $student['department_name']; ?></td>
+                                            <td>
+                                                <?php foreach ($student['courses'] as $course): ?>
+                                                    <div>
+                                                        <a href="course_students.php?course_id=<?php echo $course['id']; ?>">
+                                                            <?php echo $course['code']; ?>: <?php echo $course['title']; ?>
+                                                        </a>
+                                                        <?php if ($currentSemester && $course['semester_id'] == $currentSemester['id']): ?>
+                                                            <span class="badge bg-primary">Current</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                // Show links for current semester courses
+                                                $currentSemesterCourses = array_filter($student['courses'], function($c) use ($currentSemester) {
+                                                    return $currentSemester && $c['semester_id'] == $currentSemester['id'];
+                                                });
+                                                
+                                                foreach ($currentSemesterCourses as $course): 
+                                                ?>
+                                                    <a href="grade_student.php?student_id=<?php echo $student['id']; ?>&course_id=<?php echo $course['id']; ?>" 
+                                                       class="btn btn-sm btn-success mb-1">
+                                                        <i class="fas fa-edit"></i> Grade (<?php echo $course['code']; ?>)
+                                                    </a>
+                                                <?php endforeach; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
                 </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
-</div>
-
-<?php
-// Include footer
-include '../includes/footer.php';
-?> 
+    
+    <!-- Footer -->
+    <footer class="bg-light text-center text-lg-start mt-auto">
+        <div class="text-center p-3" style="background-color: rgba(0, 0, 0, 0.05);">
+            © 2023 Teacher Dashboard - Nigerian Education System
+        </div>
+    </footer>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
