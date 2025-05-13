@@ -3,6 +3,7 @@ require_once '../classes/SessionManager.php';
 require_once '../classes/User.php';
 require_once '../classes/Course.php';
 require_once '../classes/Grade.php';
+require_once '../classes/Attendance.php';
 require_once '../classes/Utility.php';
 
 SessionManager::startSession();
@@ -29,6 +30,7 @@ $course_id = intval($_GET['course_id']);
 // Initialize classes
 $course = new Course();
 $grade = new Grade();
+$attendance = new Attendance();
 
 // Get course details
 $courseData = $course->getCourseById($course_id);
@@ -43,7 +45,7 @@ if (!$courseData || $courseData['teacher_id'] != $user_id) {
 // Get students enrolled in the course
 $students = $course->getCourseStudents($course_id);
 
-// Process grade submission if form is submitted
+// Process grade and attendance submission if form is submitted
 if (Utility::isPostRequest()) {
     $success = true;
     $errorMessage = '';
@@ -70,9 +72,32 @@ if (Utility::isPostRequest()) {
             break;
         }
     }
+
+    foreach ($_POST['attendance'] as $student_id => $attendance_percentage) {
+        // Skip empty attendance percentages
+        if (trim($attendance_percentage) === '') continue;
+
+        $attendance_percentage = floatval($attendance_percentage);
+
+        // Validate attendance percentage
+        if ($attendance_percentage < 0 || $attendance_percentage > 100) {
+            $success = false;
+            $errorMessage = 'Attendance percentages must be between 0 and 100.';
+            break;
+        }
+
+        // Set attendance
+        $result = $attendance->setAttendance($student_id, $course_id, $attendance_percentage, $user_id);
+
+        if (!$result) {
+            $success = false;
+            $errorMessage = 'Failed to save attendance. Please try again.';
+            break;
+        }
+    }
     
     if ($success) {
-        SessionManager::setFlash('success', 'Grades have been saved successfully.');
+        SessionManager::setFlash('success', 'Grades and attendance have been saved successfully.');
         header('Location: course_grades.php?course_id=' . $course_id);
         exit;
     } else {
@@ -86,7 +111,7 @@ include '../includes/header.php';
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Grades for <?php echo $courseData['course_code']; ?>: <?php echo $courseData['title']; ?></h1>
+        <h1>Grades and Attendance for <?php echo $courseData['course_code']; ?>: <?php echo $courseData['title']; ?></h1>
         <div>
             <a href="course_students.php?course_id=<?php echo $course_id; ?>" class="btn btn-primary me-2">
                 <i class="fas fa-users"></i> View Students
@@ -120,10 +145,10 @@ include '../includes/header.php';
         </div>
     </div>
     
-    <!-- Grades Form -->
+    <!-- Grades and Attendance Form -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Manage Grades</h6>
+            <h6 class="m-0 font-weight-bold text-primary">Manage Grades and Attendance</h6>
         </div>
         <div class="card-body">
             <?php if (empty($students)): ?>
@@ -154,6 +179,7 @@ include '../includes/header.php';
                                     <th>Score (0-100)</th>
                                     <th>Current Grade</th>
                                     <th>Grade Point</th>
+                                    <th>Attendance (%)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -164,6 +190,10 @@ include '../includes/header.php';
                                     $currentScore = $hasGrade ? $studentGrade['score'] : '';
                                     $currentGrade = $hasGrade ? $studentGrade['grade'] : '-';
                                     $currentGradePoint = $hasGrade ? $studentGrade['grade_point'] : '-';
+
+                                    // Check if student has attendance for this course
+                                    $studentAttendance = $attendance->getAttendance($student['id'], $course_id);
+                                    $currentAttendance = $studentAttendance !== false ? $studentAttendance['percentage'] : '';
                                 ?>
                                     <tr>
                                         <td><?php echo $student['id']; ?></td>
@@ -175,6 +205,10 @@ include '../includes/header.php';
                                         </td>
                                         <td><?php echo $currentGrade; ?></td>
                                         <td><?php echo $currentGradePoint; ?></td>
+                                        <td>
+                                            <input type="number" class="form-control" name="attendance[<?php echo $student['id']; ?>]" 
+                                                   value="<?php echo $currentAttendance; ?>" min="0" max="100" step="0.01">
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -183,7 +217,7 @@ include '../includes/header.php';
                     
                     <div class="mt-3">
                         <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save"></i> Save Grades
+                            <i class="fas fa-save"></i> Save Grades and Attendance
                         </button>
                     </div>
                 </form>
@@ -195,4 +229,4 @@ include '../includes/header.php';
 <?php
 // Include footer
 include '../includes/footer.php';
-?> 
+?>

@@ -1,49 +1,76 @@
 <?php
 class Database {
-    private $host = "localhost";
-    private $username = "root";
-    private $password = "";
-    private $database = "school_dashboard";
+    private $host = 'localhost';
+    private $user = 'root';
+    private $pass = '';
+    private $dbname = 'school_dashboard';
+
     private $conn;
-    
-    // Constructor
+    private $stmt;
+
     public function __construct() {
-        $this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
-        
-        // Check connection
+        $this->conn = new mysqli($this->host, $this->user, $this->pass, $this->dbname);
+
         if ($this->conn->connect_error) {
-            die("Connection failed: " . $this->conn->connect_error);
+            die('Connection failed: ' . $this->conn->connect_error);
         }
     }
-    
-    // Get database connection
-    public function getConnection() {
-        return $this->conn;
-    }
-    
-    // Execute a query and return the result
+
+    // Prepare the query
     public function query($sql) {
-        return $this->conn->query($sql);
+        $this->stmt = $this->conn->prept are($sql);
+        if (!$this->stmt) {
+            die('Query preparation failed: ' . $this->conn->error);
+        }
+        return $this->stmt; // Return the prepared statement
     }
-    
-    // Execute a prepared statement
-    public function prepare($sql) {
-        return $this->conn->prepare($sql);
+
+    // Bind parameters
+    public function bind($param, $value, $type = null) {
+        if (is_null($type)) {
+            switch (true) {
+                case is_int($value):
+                    $type = 'i'; // Integer
+                    break;
+                case is_float($value):
+                    $type = 'd'; // Double
+                    break;
+                case is_bool($value):
+                    $type = 'i'; // Boolean as integer
+                    break;
+                default:
+                    $type = 's'; // String
+            }
+        }
+        $this->stmt->bind_param($type, $value);
     }
-    
-    // Get the last inserted ID
-    public function getLastId() {
-        return $this->conn->insert_id;
+
+    // Execute the statement
+    public function execute() {
+        return $this->stmt->execute();
     }
-    
-    // Close the database connection
+
+    // Get a single result
+    public function single() {
+        $this->execute();
+        $result = $this->stmt->get_result();
+        return $result->fetch_assoc();
+    }
+
+    // Get multiple results
+    public function resultSet() {
+        $this->execute();
+        $result = $this->stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // Close the statement
     public function close() {
+        $this->stmt->close();
+    }
+
+    // Close the connection
+    public function __destruct() {
         $this->conn->close();
     }
-    
-    // Escape string for safety
-    public function escapeString($string) {
-        return $this->conn->real_escape_string($string);
-    }
 }
-?> 

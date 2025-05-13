@@ -1,193 +1,198 @@
 <?php
 require_once '../classes/SessionManager.php';
+require_once '../classes/User.php';
 require_once '../classes/Course.php';
+require_once '../classes/Attendance.php';
+require_once '../classes/Utility.php';
 
 SessionManager::startSession();
 
 // Redirect if not logged in or not a teacher
-if (!SessionManager::isLoggedIn() || SessionManager::getUserTypeId() != 2) {
+if (!SessionManager::isLoggedIn() || !SessionManager::isTeacher()) {
     SessionManager::setFlash('error', 'You must be logged in as a teacher to access this page.');
-    header('Location: ../login.php');
+    header('Location: login.php');
     exit;
 }
 
-// Fetch courses assigned to the teacher
-$course = new Course();
-$teacherCourses = $course->getCoursesByTeacherId(SessionManager::getUserId());
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Courses</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
-        .navbar {
-            background-color: #0d6efd;
-            padding: 10px 0;
-        }
-        .navbar-brand {
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            margin-left: 15px;
-        }
-        .layout-container {
-            display: table;
-            width: 100%;
-            height: calc(100vh - 56px);
-        }
-        .sidebar {
-            display: table-cell;
-            width: 250px;
-            background-color: #f8f9fa;
-            vertical-align: top;
-            border-right: 1px solid #dee2e6;
-        }
-        .content {
-            display: table-cell;
-            vertical-align: top;
-            padding: 20px;
-        }
-        .list-group-item {
-            border-radius: 0;
-            border-left: none;
-            border-right: none;
-        }
-        .list-group-item.active {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-        .card {
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .alert {
-            margin-bottom: 15px;
-        }
-        .btn-block {
-            display: block;
-            width: 100%;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="dashboard.php">Teacher Dashboard</a>
-            <div class="ms-auto">
-                <div class="dropdown">
-                    <a class="text-white dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
-                        <i class="fas fa-user-circle"></i> <?php echo SessionManager::getUserName(); ?>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuLink">
-                        <li><a class="dropdown-item" href="profile.php">Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+// Get user data
+$user_id = SessionManager::getUserId();
 
-    <!-- Layout Container -->
-    <div class="layout-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="list-group list-group-flush">
-                <a href="dashboard.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+// Initialize classes
+$course = new Course();
+$attendance = new Attendance();
+
+// Check if course_id is provided
+if (isset($_GET['course_id']) && !empty($_GET['course_id'])) {
+    $course_id = intval($_GET['course_id']);
+
+    // Get course details
+    $courseData = $course->getCourseById($course_id);
+
+    // Check if course exists and belongs to the teacher
+    if (!$courseData || $courseData['teacher_id'] != $user_id) {
+        SessionManager::setFlash('error', 'You are not authorized to view this course or the course does not exist.');
+        header('Location: courses.php');
+        exit;
+    }
+
+    // Get students enrolled in the course
+    $students = $course->getCourseStudents($course_id);
+
+    // Process attendance submission if form is submitted
+    if (Utility::isPostRequest()) {
+        $success = true;
+        $errorMessage = '';
+
+        foreach ($_POST['attendance'] as $student_id => $attendance_percentage) {
+            // Skip empty attendance percentages
+            if (trim($attendance_percentage) === '') continue;
+
+            $attendance_percentage = floatval($attendance_percentage);
+
+            // Validate attendance percentage
+            if ($attendance_percentage < 0 || $attendance_percentage > 100) {
+                $success = false;
+                $errorMessage = 'Attendance percentages must be between 0 and 100.';
+                break;
+            }
+
+            // Set attendance
+            $result = $attendance->setAttendance($student_id, $course_id, $attendance_percentage, $user_id);
+
+            if (!$result) {
+                $success = false;
+                $errorMessage = 'Failed to save attendance. Please try again.';
+                break;
+            }
+        }
+
+        if ($success) {
+            SessionManager::setFlash('success', 'Attendance has been saved successfully.');
+            header('Location: courses.php?course_id=' . $course_id);
+            exit;
+        } else {
+            SessionManager::setFlash('error', $errorMessage);
+        }
+    }
+} else {
+    // If no course_id is provided, display a list of courses
+    $courses = $course->getCoursesByTeacherId($user_id);
+}
+
+// Include header
+include '../includes/header.php';
+?>
+
+<div class="container-fluid">
+    <?php if (isset($course_id)): ?>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Attendance for <?php echo $courseData['course_code']; ?>: <?php echo $courseData['title']; ?></h1>
+            <div>
+                <a href="course_students.php?course_id=<?php echo $course_id; ?>" class="btn btn-primary me-2">
+                    <i class="fas fa-users"></i> View Students
                 </a>
-                <a href="courses.php" class="list-group-item list-group-item-action active">
-                    <i class="fas fa-book me-2"></i> My Courses
-                </a>
-                <a href="students.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-user-graduate me-2"></i> My Students
-                </a>
-                <a href="grades.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-chart-bar me-2"></i> Manage Grades
-                </a>
-                
-                <a href="profile.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-user me-2"></i> Profile
-                </a>
-                <a href="../logout.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                <a href="courses.php" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Courses
                 </a>
             </div>
         </div>
         
-        <!-- Main Content -->
-        <div class="content">
-            <h1 class="mb-4">My Courses</h1>
-            
-            <!-- Courses Table -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Courses Assigned to Me</h6>
+        <!-- Course Details Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Course Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>Course Code:</strong> <?php echo $courseData['course_code']; ?></p>
+                        <p><strong>Title:</strong> <?php echo $courseData['title']; ?></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Department:</strong> <?php echo $courseData['department_name']; ?></p>
+                        <p><strong>Semester:</strong> <?php echo $courseData['semester_name']; ?></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Credit Units:</strong> <?php echo $courseData['credit_units']; ?></p>
+                        <p><strong>Students Enrolled:</strong> <?php echo count($students); ?></p>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <?php if (empty($teacherCourses)): ?>
-                        <p class="text-center">You are not assigned to any courses.</p>
-                        <p class="text-center">Please contact the administrator to be assigned to courses.</p>
-                    <?php else: ?>
+            </div>
+        </div>
+        
+        <!-- Attendance Form -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Manage Attendance</h6>
+            </div>
+            <div class="card-body">
+                <?php if (empty($students)): ?>
+                    <div class="alert alert-info">
+                        <p>No students are currently enrolled in this course.</p>
+                    </div>
+                <?php else: ?>
+                    <form method="POST" action="">
                         <div class="table-responsive">
-                            <table class="table table-bordered">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
                                 <thead>
                                     <tr>
-                                        <th>Code</th>
-                                        <th>Title</th>
+                                        <th>Student ID</th>
+                                        <th>Name</th>
                                         <th>Department</th>
-                                        <th>Semester</th>
-                                        <th>Credit Units</th>
-                                        <th>Actions</th>
+                                        <th>Attendance (%)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($teacherCourses as $courseData): ?>
+                                    <?php foreach ($students as $student): 
+                                        // Check if student has attendance for this course
+                                        $studentAttendance = $attendance->getAttendance($student['id'], $course_id);
+                                        $currentAttendance = $studentAttendance !== false ? $studentAttendance['percentage'] : '';
+                                    ?>
                                         <tr>
-                                            <td><?php echo $courseData['course_code']; ?></td>
-                                            <td><?php echo $courseData['title']; ?></td>
-                                            <td><?php echo $courseData['department_name']; ?></td>
-                                            <td><?php echo $courseData['semester_name']; ?></td>
-                                            <td><?php echo $courseData['credit_units']; ?></td>
+                                            <td><?php echo $student['id']; ?></td>
+                                            <td><?php echo $student['full_name']; ?></td>
+                                            <td><?php echo $student['department_name']; ?></td>
                                             <td>
-                                                <a href="course_students.php?course_id=<?php echo $courseData['id']; ?>" class="btn btn-sm btn-primary">
-                                                    <i class="fas fa-users"></i> Students
-                                                </a>
-                                                <a href="course_grades.php?course_id=<?php echo $courseData['id']; ?>" class="btn btn-sm btn-success">
-                                                    <i class="fas fa-chart-bar"></i> Grades
-                                                </a>
+                                                <input type="number" class="form-control" name="attendance[<?php echo $student['id']; ?>]" 
+                                                       value="<?php echo $currentAttendance; ?>" min="0" max="100" step="0.01">
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                    <?php endif; ?>
-                </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Save Attendance
+                            </button>
+                        </div>
+                    </form>
+                <?php endif; ?>
             </div>
         </div>
-    </div>
-    
-    <!-- Footer -->
-    <footer class="bg-light text-center text-lg-start mt-auto">
-        <div class="text-center p-3" style="background-color: rgba(0, 0, 0, 0.05);">
-            © 2023 Teacher Dashboard - Nigerian Education System
+    <?php else: ?>
+        <h1 class="mb-4">My Courses</h1>
+        <div class="row">
+            <?php foreach ($courses as $course): ?>
+                <div class="col-md-4">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <h5><?php echo $course['title']; ?></h5>
+                            <p><strong>Course Code:</strong> <?php echo $course['course_code']; ?></p>
+                            <p><strong>Department:</strong> <?php echo $course['department_name']; ?></p>
+                            <a href="courses.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary">
+                                <i class="fas fa-edit"></i> Manage Attendance
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
-    </footer>
-    
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    <?php endif; ?>
+</div>
+
+<?php
+// Include footer
+include '../includes/footer.php';
+?>

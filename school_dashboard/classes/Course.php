@@ -48,7 +48,7 @@ class Course {
     public function getEnrolledStudentsCount($course_id) {
         $sql = "SELECT COUNT(*) as count FROM student_courses WHERE course_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $course_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -70,7 +70,7 @@ class Course {
                 LEFT JOIN users u ON c.teacher_id = u.id 
                 WHERE c.id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -90,7 +90,7 @@ class Course {
                 LEFT JOIN semesters s ON c.semester_id = s.id 
                 WHERE c.teacher_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $teacher_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -112,7 +112,7 @@ class Course {
                 LEFT JOIN users u ON c.teacher_id = u.id 
                 WHERE c.department_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $department_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -134,7 +134,7 @@ class Course {
                 LEFT JOIN users u ON c.teacher_id = u.id 
                 WHERE c.semester_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $semester_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -157,7 +157,7 @@ class Course {
                 LEFT JOIN users u ON c.teacher_id = u.id 
                 WHERE sc.student_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $student_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -178,7 +178,7 @@ class Course {
                 LEFT JOIN departments d ON u.department_id = d.id 
                 WHERE sc.course_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $course_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -196,7 +196,7 @@ class Course {
         $sql = "INSERT INTO courses (course_name, course_code, description, credit_hours, department_id, teacher_id) 
                 VALUES (?, ?, ?, ?, ?, ?)";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("sssiii", $course_name, $course_code, $description, $credit_hours, $department_id, $teacher_id);
         
         return $stmt->execute();
@@ -208,7 +208,7 @@ class Course {
                 SET course_name = ?, course_code = ?, description = ?, credit_hours = ?, department_id = ?, teacher_id = ? 
                 WHERE id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("sssiiii", $course_name, $course_code, $description, $credit_hours, $department_id, $teacher_id, $id);
         
         return $stmt->execute();
@@ -218,7 +218,7 @@ class Course {
     public function deleteCourse($id) {
         $sql = "DELETE FROM courses WHERE id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("i", $id);
         
         return $stmt->execute();
@@ -228,7 +228,7 @@ class Course {
     public function registerStudentForCourse($student_id, $course_id, $semester_id) {
         // Check if already registered
         $check_sql = "SELECT id FROM student_courses WHERE student_id = ? AND course_id = ? AND semester_id = ?";
-        $check_stmt = $this->db->prepare($check_sql);
+        $check_stmt = $this->db->query($check_sql);
         $check_stmt->bind_param("iii", $student_id, $course_id, $semester_id);
         $check_stmt->execute();
         $check_result = $check_stmt->get_result();
@@ -239,7 +239,7 @@ class Course {
         
         $sql = "INSERT INTO student_courses (student_id, course_id, semester_id) VALUES (?, ?, ?)";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("iii", $student_id, $course_id, $semester_id);
         
         return $stmt->execute();
@@ -249,7 +249,7 @@ class Course {
     public function unregisterStudentFromCourse($student_id, $course_id) {
         $sql = "DELETE FROM student_courses WHERE student_id = ? AND course_id = ?";
         
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->query($sql);
         $stmt->bind_param("ii", $student_id, $course_id);
         
         return $stmt->execute();
